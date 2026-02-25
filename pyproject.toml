@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bearpaw"
+name = "bearpaw-daemon"
 version = "1.0.0"
 description = "Bearpaw backend service for Uniden scanners"
 readme = "README.md"
@@ -24,6 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
+bearpaw-daemon = "bearpaw.main:main"
 bearpaw = "bearpaw.main:main"
 
 [tool.setuptools]
