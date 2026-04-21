@@ -8,7 +8,7 @@ Runs as a pseudo-terminal that responds to scanner commands.
 
 import asyncio
 import sys
-from typing import Optional, List, Dict, Tuple
+from typing import Dict
 
 
 class MockBC125ATScanner:
@@ -151,7 +151,7 @@ class MockSerialPort:
         self.mock_scanner = mock_scanner
 
     def write(self, data: bytes):
-        command_str = data.decode('utf-8').strip()
+        command_str = data.decode("utf-8").strip()
         print(f"[RECV] {command_str}")
         return asyncio.create_task(self._process_command(command_str))
 
@@ -181,7 +181,7 @@ async def mock_scanner_server():
     try:
         from serial_asyncio import create_serial_connection
 
-        ser = await create_serial_connection('/dev/pts/1', baudrate=57600)
+        ser = await create_serial_connection("/dev/pts/1", baudrate=57600)
         ser = MockSerialPort(mock_scanner)
 
         print("Mock scanner server started")
@@ -192,15 +192,21 @@ async def mock_scanner_server():
             try:
                 data = await ser.readline()
                 if data:
-                    command = data.decode('utf-8').strip()
+                    command = data.decode("utf-8").strip()
                     if command:
-                        response = await ser.process_command(command)
+                        _response = await ser.process_command(
+                            command
+                        )  # TODO: write back over serial
 
             except (KeyboardInterrupt, asyncio.CancelledError):
                 print("\n" + "=" * 60)
                 print("Mock scanner server stopped")
                 print("=" * 60)
                 break
+    except ImportError as exc:
+        print(f"Missing dependency: {exc}")
+    except Exception as exc:
+        print(f"Mock scanner server error: {exc}")
 
 
 if __name__ == "__main__":

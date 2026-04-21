@@ -1,8 +1,6 @@
 import asyncio
-from typing import Optional
 from bearpaw.models import ChannelData, LiveState
 from bearpaw.protocol.base import ScannerDriver
-from bearpaw.scheduler import Command, CommandScheduler
 
 
 class MockDriver(ScannerDriver):

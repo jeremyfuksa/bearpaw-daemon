@@ -1,9 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi.testclient import TestClient
 from bearpaw.main import app
 from bearpaw.state import RuntimeState
-from bearpaw.scheduler import CommandScheduler
 from bearpaw.models import AppConfig
 from tests.stubs import MockDriver, MockScheduler, MockTransport
 

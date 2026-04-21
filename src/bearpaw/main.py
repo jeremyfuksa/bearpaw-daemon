@@ -12,8 +12,7 @@ from typing import Optional
 import uvicorn
 
 from bearpaw.api import create_app
-from bearpaw.config import AppConfig, load_config
-from bearpaw.middleware import add_cors_middleware
+from bearpaw.config import load_config
 from bearpaw.middleware import add_cors_middleware
 
 

@@ -7,10 +7,10 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, WebSocket
-from fastapi.responses import JSONResponse, Response as StarletteResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -67,9 +67,7 @@ from bearpaw.preferences import PreferencesStore
 logger = logging.getLogger("bearpaw")
 
 
-def _set_device_diagnostic(
-    device_info: DeviceInfo, code: str, message: str
-) -> None:
+def _set_device_diagnostic(device_info: DeviceInfo, code: str, message: str) -> None:
     device_info.diagnostic_code = code
     device_info.diagnostic_message = message
 
@@ -83,9 +81,11 @@ def _safe_create_task(coro):
     """Create a task with error logging to prevent silent failures."""
     task = asyncio.create_task(coro)
     task.add_done_callback(
-        lambda t: logger.exception("Background task failed: %s", t.exception())
-        if t.exception()
-        else None
+        lambda t: (
+            logger.exception("Background task failed: %s", t.exception())
+            if t.exception()
+            else None
+        )
     )
     return task
 
@@ -293,7 +293,9 @@ def create_app(
                         device_info.connection_status = "connected"
                         _clear_device_diagnostic(device_info)
                     except Exception as exc:
-                        logger.warning("Serial connection failed on %s: %s", device_port, exc)
+                        logger.warning(
+                            "Serial connection failed on %s: %s", device_port, exc
+                        )
                         transport = None
                         device_info.connection_status = "disconnected"
                         _set_device_diagnostic(
@@ -317,10 +319,14 @@ def create_app(
 
                 model = await asyncio.wrap_future(transport.send_command("MDL"))
                 model = (
-                    model.split(",", 1)[1].strip() if model.startswith("MDL,") else model
+                    model.split(",", 1)[1].strip()
+                    if model.startswith("MDL,")
+                    else model
                 )
                 driver = (
-                    SR30CDriver(scheduler) if "SR30C" in model else BC125ATDriver(scheduler)
+                    SR30CDriver(scheduler)
+                    if "SR30C" in model
+                    else BC125ATDriver(scheduler)
                 )
                 device_info.model = model.strip()
                 device_info.connection_status = "connected"
@@ -333,7 +339,9 @@ def create_app(
                         firmware = await firmware_getter()
                         device_info.firmware = firmware
                     except Exception as exc:
-                        logger.warning("Failed to read firmware during startup: %s", exc)
+                        logger.warning(
+                            "Failed to read firmware during startup: %s", exc
+                        )
                         device_info.firmware = None
             except Exception as exc:
                 logger.warning("Transport initialization failed: %s", exc)
@@ -1304,8 +1312,8 @@ def create_app(
     ) -> Dict[str, str]:
         runtime: RuntimeState = app.state.runtime
         driver = require_driver(runtime)
-        if request and request.force:
-            force = True
+        # NOTE: `force` (both query param and request.force) is currently ignored;
+        # memory sync always performs a full read. Keeping the arg for API compat.
         if runtime.sync_task:
             return {"status": "already_running", "task_id": runtime.sync_task.task_id}
         task = MemorySyncTask(driver, runtime.state_store, runtime.ws_manager)
@@ -1494,16 +1502,6 @@ def create_app(
         except Exception as exc:
             logger.exception("Error loading preference %s: %s", key, exc)
             raise HTTPException(status_code=500, detail="internal_error")
-
-    @app.get("/api/v1/preferences/{key}")
-    async def get_preference(key: str) -> Dict[str, Any]:
-        runtime: RuntimeState = app.state.runtime
-        if not runtime.preferences_store:
-            raise HTTPException(status_code=503, detail="preferences_not_configured")
-        value = runtime.preferences_store.get(key)
-        if value is None:
-            raise HTTPException(status_code=404, detail=f"Unknown preference: {key}")
-        return {"key": key, "value": value}
 
     @app.put("/api/v1/preferences/{key}")
     async def set_preference(key: str, request: Dict[str, Any]) -> Dict[str, Any]:
