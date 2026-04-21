@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# As more apps move into apps/*, consider adding `paths:` filters so
+# editing one app's sources doesn't re-run every job.
+
 jobs:
-  test:
-    name: test (python ${{ matrix.python-version }})
+  daemon-test:
+    name: daemon test (python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/daemon
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +28,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: apps/daemon/pyproject.toml
 
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev
@@ -35,16 +42,18 @@ jobs:
       - name: Run tests
         run: pytest -v
 
-  lint:
-    name: lint
+  daemon-lint:
+    name: daemon lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/daemon
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
 
       - name: Install ruff
         run: pip install ruff
