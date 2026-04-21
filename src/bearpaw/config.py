@@ -103,6 +103,33 @@ class RecordingConfig(BaseModel):
     audio_device_index: Optional[int] = None
 
 
+class AudioConfig(BaseModel):
+    """Live HLS audio streaming from a scanner's headphone jack.
+
+    Requires a scanner connected to the host's audio input (e.g. via a USB
+    audio adapter on a Raspberry Pi) and a system `ffmpeg` binary. Disabled
+    by default so existing deployments are unaffected.
+    """
+
+    enabled: bool = False
+    # ffmpeg input format. "alsa" on Linux (including Raspberry Pi),
+    # "avfoundation" on macOS for local dev, "dshow" on Windows.
+    input_format: str = "alsa"
+    # ALSA device (e.g. "hw:1,0"), AVFoundation index (":1"), or dshow name.
+    device: str = "hw:1,0"
+    # Mono AAC bitrate in kbps. Narrowband voice is fine at 32-64.
+    bitrate: int = 64
+    sample_rate: int = 22050
+    # HLS tuning.
+    segment_duration: int = 2  # seconds per segment
+    buffer_segments: int = 15  # rolling window size
+    # Directory ffmpeg writes playlist + segments to. Recommended to mount
+    # as tmpfs on Pi to avoid SD card wear.
+    output_dir: str = "/tmp/bearpaw-hls"
+    # Path to the ffmpeg binary. Auto-discovered via PATH when None.
+    ffmpeg_path: Optional[str] = None
+
+
 class AppConfig(BaseModel):
     device: DeviceConfig = Field(default_factory=DeviceConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)
@@ -112,6 +139,7 @@ class AppConfig(BaseModel):
     analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     websocket: WebSocketConfig = Field(default_factory=WebSocketConfig)
+    audio: AudioConfig = Field(default_factory=AudioConfig)
 
 
 def load_config(path: Optional[str]) -> AppConfig:

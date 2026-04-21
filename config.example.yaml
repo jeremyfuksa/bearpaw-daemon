@@ -52,3 +52,24 @@ logging:
 websocket:
   ping_interval: 30
   ping_timeout: 10
+
+# Live HLS audio streaming from the scanner's headphone jack.
+# Requires a system `ffmpeg` binary and a scanner audio feed patched
+# into the host's audio input (USB audio adapter on a Pi, etc.).
+# Disabled by default so existing deployments are unaffected.
+audio:
+  enabled: false
+  # ffmpeg input format: `alsa` on Linux/Pi, `avfoundation` on macOS,
+  # `dshow` on Windows.
+  input_format: alsa
+  # ALSA device (`hw:1,0`), AVFoundation index (`:1`), or dshow name.
+  device: "hw:1,0"
+  bitrate: 64           # kbps, mono AAC-LC
+  sample_rate: 22050    # narrowband voice; 22050 is ample
+  segment_duration: 2   # seconds per HLS segment
+  buffer_segments: 15   # rolling window size (~30 sec of audio)
+  # Where ffmpeg writes the playlist and segments. Recommended to
+  # mount this as tmpfs on a Pi to avoid SD card wear.
+  output_dir: /tmp/bearpaw-hls
+  # Path to ffmpeg. If null, Bearpaw discovers it via PATH.
+  ffmpeg_path: null

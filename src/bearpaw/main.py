@@ -200,7 +200,7 @@ def main() -> None:
         sys.exit(2)
 
     app = create_app(config, port_override=args.port)
-    add_cors_middleware(app)
+    add_cors_middleware(app, origins=config.api.cors_origins)
     _install_access_log_filters()
     if args.foreground:
         asyncio.run(
