@@ -45,7 +45,9 @@ class MemorySyncTask:
                 channel = await self.driver.read_channel(idx, assume_program_mode=True)
                 channels[idx] = channel
                 if idx % 10 == 0:
-                    await self._publish_progress(idx, f"Syncing channel {idx}/{self.max_channels}")
+                    await self._publish_progress(
+                        idx, f"Syncing channel {idx}/{self.max_channels}"
+                    )
                 await asyncio.sleep(0)
             self.state_store.set_shadow_state(channels)
             self.state_store.save_shadow()

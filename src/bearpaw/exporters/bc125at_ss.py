@@ -280,7 +280,9 @@ async def export_bc125at_ss(driver: BC125ATDriver, region: str = "USA") -> str:
         charge_time = _split_response(await driver.send_program_command("BSV"))[0]
         priority_mode = _split_response(await driver.send_program_command("PRI"))[0]
         scan_flags = _split_response(await driver.send_program_command("SCG"))[0]
-        search_delay, search_code = _split_response(await driver.send_program_command("SCO"))
+        search_delay, search_code = _split_response(
+            await driver.send_program_command("SCO")
+        )
         cc_mode, cc_beep, cc_light, cc_bands, cc_lockout = _split_response(
             await driver.send_program_command("CLC")
         )
@@ -293,7 +295,9 @@ async def export_bc125at_ss(driver: BC125ATDriver, region: str = "USA") -> str:
 
         custom_ranges: List[CustomSearchRange] = []
         for idx in range(1, 11):
-            range_parts = _split_response(await driver.send_program_command(f"CSP,{idx}"))
+            range_parts = _split_response(
+                await driver.send_program_command(f"CSP,{idx}")
+            )
             if len(range_parts) >= 3:
                 lower_hz = int(range_parts[1]) * 100
                 upper_hz = int(range_parts[2]) * 100
@@ -339,7 +343,9 @@ async def export_bc125at_ss(driver: BC125ATDriver, region: str = "USA") -> str:
     lines: List[str] = []
 
     misc_backlight = BACKLIGHT_MAP.get(backlight, "Off")
-    misc_beep = "Auto" if beep_level == "0" else "Off" if beep_level == "99" else beep_level
+    misc_beep = (
+        "Auto" if beep_level == "0" else "Off" if beep_level == "99" else beep_level
+    )
     misc_key_lock = "On" if key_lock == "1" else "Off"
     lines.append(
         "\t".join(
@@ -395,14 +401,20 @@ async def export_bc125at_ss(driver: BC125ATDriver, region: str = "USA") -> str:
 
     cc_band_flags = _flags_to_bools(cc_bands)
     lines.append(
-        "\t".join(["CloseCallBands", *("On" if flag else "Off" for flag in cc_band_flags)])
+        "\t".join(
+            ["CloseCallBands", *("On" if flag else "Off" for flag in cc_band_flags)]
+        )
     )
 
     lines.append("\t".join(["GeneralSearch", search_delay, _on_off(search_code)]))
 
     scan_enabled = _flags_to_bools(scan_flags)
     for idx, enabled in enumerate(scan_enabled, start=1):
-        lines.append("\t".join(["Conventional", str(idx), f"Bank {idx}", "On" if enabled else "Off"]))
+        lines.append(
+            "\t".join(
+                ["Conventional", str(idx), f"Bank {idx}", "On" if enabled else "Off"]
+            )
+        )
 
     for channel in channels:
         lines.append(

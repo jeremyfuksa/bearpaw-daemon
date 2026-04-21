@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field as dataclass_field
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 from bearpaw.models import (
     ChannelData,
     LiveState,

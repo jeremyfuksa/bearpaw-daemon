@@ -24,7 +24,9 @@ class ScannerDriver(ABC):
         """Simulate keypress."""
 
     @abstractmethod
-    async def read_channel(self, index: int, assume_program_mode: bool = False) -> ChannelData:
+    async def read_channel(
+        self, index: int, assume_program_mode: bool = False
+    ) -> ChannelData:
         """Read channel memory (requires PRG mode)."""
 
     @abstractmethod
@@ -160,7 +162,9 @@ class ScannerDriver(ABC):
         """Return custom search range in MHz."""
         raise NotImplementedError
 
-    async def set_custom_search_range(self, index: int, lower: float, upper: float) -> bool:
+    async def set_custom_search_range(
+        self, index: int, lower: float, upper: float
+    ) -> bool:
         """Set custom search range in MHz."""
         raise NotImplementedError
 

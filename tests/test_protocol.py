@@ -3,7 +3,9 @@ import os
 import sys
 import unittest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 from bearpaw.protocol.base import ScannerDriver
 from bearpaw.protocol.bc125at import BC125ATDriver
@@ -30,7 +32,9 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields["FRQ"], "151.2500")
 
     async def test_bc125at_get_status(self) -> None:
-        response = "SQL,0\rRSSI,75\rSYS,USA\rMOD,FM\rCH,025\rFRQ,151.2500\rVOL,10\rBAT,100\r"
+        response = (
+            "SQL,0\rRSSI,75\rSYS,USA\rMOD,FM\rCH,025\rFRQ,151.2500\rVOL,10\rBAT,100\r"
+        )
         driver = BC125ATDriver(StubScheduler([response]))
         state = await driver.get_status()
         self.assertEqual(state.frequency, 151.25)

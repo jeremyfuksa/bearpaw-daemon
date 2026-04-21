@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import unittest
+from concurrent.futures import Future
 
 from fastapi.testclient import TestClient
 
@@ -10,7 +11,7 @@ sys.path.insert(
 )
 
 from bearpaw.api import RuntimeState, create_app
-from bearpaw.config import AppConfig
+from bearpaw.config import AppConfig, WebSocketConfig
 from bearpaw.models import ChannelData, DeviceInfo, LiveState
 from bearpaw.state import StateStore
 from bearpaw.websocket import WebSocketManager
@@ -55,8 +56,6 @@ class StubScheduler:
 
 class StubTransport:
     def send_command(self, cmd: str):
-        from concurrent.futures import Future
-
         future = Future()
         future.set_result("OK")
         return future
@@ -65,7 +64,7 @@ class StubTransport:
 class ApiTests(unittest.TestCase):
     def setUp(self) -> None:
         app = create_app(AppConfig(), startup_enabled=False)
-        state_store = StateStore()
+        state_store = StateStore(persistence=None)
         state_store.update_live_state(
             LiveState(
                 timestamp=time.time(),
@@ -96,15 +95,6 @@ class ApiTests(unittest.TestCase):
                 )
             }
         )
-
-
-from bearpaw.websocket import WebSocketManager
-from bearpaw.config import WebSocketConfig, AppConfig
-
-
-class TestCaseMixin:
-    def setUp(self) -> None:
-        state_store = StateStore(persistence=None)
         ws_config = WebSocketConfig()
         app.state.runtime = RuntimeState(
             config=AppConfig(),

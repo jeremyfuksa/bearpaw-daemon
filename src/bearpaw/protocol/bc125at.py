@@ -757,12 +757,12 @@ class BC125ATDriver(ScannerDriver):
             if next_key is None:
                 break
             if next_key in seen:
-                logger.warning(
+                self._logger.warning(
                     "GLF: detected duplicate key %d, terminating list read", next_key
                 )
                 break
             if not (1 <= next_key <= 500):
-                logger.warning(
+                self._logger.warning(
                     "GLF: invalid key %d (must be 1-500), terminating list read",
                     next_key,
                 )
