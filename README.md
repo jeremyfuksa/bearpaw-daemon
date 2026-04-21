@@ -13,6 +13,40 @@ Headless Python FastAPI service for Uniden scanner control and telemetry.
 
 See `docs/BACKEND_SPEC.md` for the schema and examples.
 
+## Raspberry Pi installation
+
+For a production Pi deployment, use the installer:
+
+```bash
+git clone https://github.com/jeremyfuksa/bearpaw-daemon.git
+cd bearpaw-daemon
+sudo ./scripts/install-pi.sh
+```
+
+The installer is idempotent — safe to re-run after updates. It:
+
+1. Installs system packages (`ffmpeg`, `libusb-1.0-0-dev`, `python3-venv`)
+2. Creates a `scanner` system user with `dialout` and `audio` group
+   membership (for `/dev/ttyACM0` and ALSA access respectively)
+3. Installs the daemon into `/opt/bearpaw/venv`
+4. Creates `/usr/local/bin/bearpaw` as a wrapper pointing at the venv
+5. Seeds `/etc/bearpaw/config.yaml` from `config.example.yaml` (only if
+   it doesn't already exist — your config is never clobbered)
+6. Installs the systemd unit and enables it (does not start it)
+7. Adds a tmpfs mount for `/tmp/bearpaw-hls` to `/etc/fstab` so HLS
+   segment rotation doesn't wear the SD card
+
+After install, edit `/etc/bearpaw/config.yaml` (at minimum pick the
+right serial port and, if you want HLS audio, set `audio.enabled: true`
+and the correct ALSA device from `arecord -l`), then:
+
+```bash
+sudo systemctl start bearpaw
+sudo journalctl -u bearpaw -f   # watch logs
+```
+
+To upgrade: `git pull`, then `sudo ./scripts/install-pi.sh` again.
+
 ## Raspberry Pi audio streaming
 
 Bearpaw can stream the scanner's audio as a live HLS feed alongside its
