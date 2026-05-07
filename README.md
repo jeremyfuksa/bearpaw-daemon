@@ -23,9 +23,12 @@ runtime; `apt install libusb-1.0-0` covers it on Debian-family systems.
 ## Running
 
 ```bash
-cp config.example.yaml config.yaml   # tune as needed
+bearpaw --print-example-config > config.yaml   # tune as needed
 bearpaw --config ./config.yaml
 ```
+
+The example config ships inside the package; `--print-example-config`
+writes it to stdout so you can pipe it to wherever you want.
 
 The daemon starts on `127.0.0.1:8000` by default. Browse `/docs` for
 the live OpenAPI UI, or `/openapi.json` for the raw schema.
@@ -115,7 +118,9 @@ analytics, preferences) for discoverability.
 
 ## Config
 
-See the full schema in `config.example.yaml`.
+See the full schema in
+[`src/bearpaw/config.example.yaml`](src/bearpaw/config.example.yaml),
+or run `bearpaw --print-example-config` once installed.
 
 ## Development
 

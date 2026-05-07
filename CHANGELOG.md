@@ -23,10 +23,21 @@ First public release on PyPI as `bearpaw-daemon`.
   audio can subscribe to the `squelch_open` event on the WebSocket
   and build their preferred pipeline (Icecast, Opus, raw PCM, etc.).
 
+### Added
+
+- `LICENSE` (MIT) ships in the source tree and in the wheel.
+- `bearpaw --print-example-config` writes the bundled example config
+  to stdout. The example file now ships inside the package as
+  `bearpaw/config.example.yaml`, so `pip install bearpaw-daemon`
+  users can produce a starting config without cloning the repo.
+
 ### Changed
 
 - Repository layout flattened: `apps/daemon/*` is now the repository
   root. Install paths and import paths are unchanged.
+- `config.example.yaml` moved to `src/bearpaw/config.example.yaml`
+  (single source of truth, packaged as `package-data`). The Linux
+  installer reads it from the new path.
 - Distributed via PyPI as `bearpaw-daemon`. Both `pip install
   bearpaw-daemon` (generic) and `sudo ./scripts/install-linux.sh`
   (Debian-family systemd setup; Raspberry Pi OS is the typical case
