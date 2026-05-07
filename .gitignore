@@ -18,6 +18,3 @@ now_scanning.txt
 events.jsonl
 *.pid
 *.log
-
-# HLS scratch dirs
-.bearpaw-hls/
