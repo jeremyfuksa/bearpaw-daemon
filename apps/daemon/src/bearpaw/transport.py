@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import os
 import threading
 import time
@@ -107,7 +108,8 @@ class SerialTransport:
             chunk = self._port.read(1)
             if chunk:
                 buffer.extend(chunk)
-                deadline = time.monotonic() + self.timeout
+                if b"\r" in chunk:
+                    break
                 continue
             if buffer:
                 break
@@ -123,25 +125,26 @@ class SerialTransport:
         return f"/tmp/bearpaw-{safe}.lock"
 
     def _acquire_lock(self) -> None:
+        # Use fcntl.flock so the lock is auto-released by the kernel on
+        # process exit (including SIGKILL), which avoids the stale-lock
+        # problem of a plain O_EXCL sentinel file.
         path = self._lock_path()
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-        except FileExistsError:
-            stat = os.stat(path)
-            if time.time() - stat.st_mtime > 300:
-                os.unlink(path)
-                fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            else:
-                raise RuntimeError(f"Serial port already locked: {path}")
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            raise RuntimeError(f"Serial port already locked: {path}")
         self._lock_fd = fd
 
     def _release_lock(self) -> None:
         if self._lock_fd is None:
             return
-        path = self._lock_path()
+        try:
+            fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
         try:
             os.close(self._lock_fd)
         finally:
             self._lock_fd = None
-            if os.path.exists(path):
-                os.unlink(path)

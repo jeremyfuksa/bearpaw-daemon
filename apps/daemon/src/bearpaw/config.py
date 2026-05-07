@@ -92,17 +92,6 @@ class LoggingConfig(BaseModel):
     format: str = "%(levelname)s %(message)s"
 
 
-class RecordingConfig(BaseModel):
-    enabled: bool = False
-    output_path: str = "./recordings"
-    format: str = "wav"
-    sample_rate: int = 44100
-    channels: int = 1
-    buffer_seconds: int = 30
-    auto_record_on_squelch: bool = False
-    audio_device_index: Optional[int] = None
-
-
 class AudioConfig(BaseModel):
     """Live HLS audio streaming from a scanner's headphone jack.
 
@@ -151,6 +140,6 @@ def load_config(path: Optional[str]) -> AppConfig:
         with open(path, "rb") as handle:
             data = tomllib.load(handle)
     else:
-        with open(path, "r", encoding="ascii") as handle:
+        with open(path, "r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle) or {}
     return AppConfig(**data)

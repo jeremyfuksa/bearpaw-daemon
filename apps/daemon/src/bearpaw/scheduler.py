@@ -25,7 +25,6 @@ class CommandScheduler:
         self._transport = transport
         self._queue: asyncio.PriorityQueue[Command] = asyncio.PriorityQueue()
         self._sequence = 0
-        self._pending_raw: set[str] = set()
         self._running = False
         self._task: Optional[asyncio.Task] = None
         self._pending_counts = {PRIORITY_CONTROL: 0}
@@ -49,14 +48,10 @@ class CommandScheduler:
     def enqueue(self, raw: str, priority: int) -> asyncio.Future:
         loop = asyncio.get_running_loop()
         future: asyncio.Future = loop.create_future()
-        if raw in self._pending_raw:
-            future.set_result("OK")
-            return future
         self._sequence += 1
         cmd = Command(
             priority=priority, sequence=self._sequence, raw=raw, future=future
         )
-        self._pending_raw.add(raw)
         if priority == PRIORITY_CONTROL:
             self._pending_counts[PRIORITY_CONTROL] = (
                 self._pending_counts.get(PRIORITY_CONTROL, 0) + 1
@@ -67,7 +62,6 @@ class CommandScheduler:
     async def _worker_loop(self) -> None:
         while self._running:
             cmd = await self._queue.get()
-            self._pending_raw.discard(cmd.raw)
             if cmd.priority == PRIORITY_CONTROL:
                 self._pending_counts[PRIORITY_CONTROL] = max(
                     0, self._pending_counts.get(PRIORITY_CONTROL, 0) - 1

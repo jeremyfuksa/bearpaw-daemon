@@ -10,9 +10,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, WebSocket
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 from bearpaw.audio import AudioCapture, HLSStream
 from bearpaw.config import AppConfig
@@ -66,10 +65,6 @@ from bearpaw.analytics.database import AnalyticsDatabase
 from bearpaw.preferences import PreferencesStore
 
 logger = logging.getLogger("bearpaw")
-
-
-class MemorySyncRequest(BaseModel):
-    force: bool = False
 
 
 def _set_device_diagnostic(device_info: DeviceInfo, code: str, message: str) -> None:
@@ -1366,13 +1361,9 @@ def create_app(
         return ChannelDataModel.model_validate(updated)
 
     @app.post("/api/v1/memory/sync")
-    async def memory_sync(
-        request: Optional[MemorySyncRequest] = None, force: bool = False
-    ) -> Dict[str, str]:
+    async def memory_sync() -> Dict[str, str]:
         runtime: RuntimeState = app.state.runtime
         driver = require_driver(runtime)
-        # NOTE: `force` (both query param and request.force) is currently ignored;
-        # memory sync always performs a full read. Keeping the arg for API compat.
         if runtime.sync_task:
             return {"status": "already_running", "task_id": runtime.sync_task.task_id}
         task = MemorySyncTask(driver, runtime.state_store, runtime.ws_manager)
@@ -1723,76 +1714,6 @@ def create_app(
         deleted = await runtime.analytics_db.cleanup_old_data(days)
         return {"deleted_records": deleted}
 
-    @app.post("/api/v1/test/simulate-hit")
-    async def simulate_hit() -> dict:
-        """Simulate a scanner hit for testing purposes"""
-        from bearpaw.models import LiveState
-
-        runtime: RuntimeState = app.state.runtime
-
-        # Create a fake hit
-        import time
-
-        timestamp = time.time()
-
-        # Update state to simulate squelch opening
-        live_state = LiveState(
-            timestamp=timestamp,
-            frequency=162.550,
-            modulation="FM",
-            squelch_open=True,
-            rssi=75,
-            mode="SCAN",
-            channel=1,
-            alpha_tag="Test Channel",
-            volume=5,
-            battery=None,
-            stale=False,
-        )
-        changes = runtime.state_store.update_live_state(live_state)
-
-        # Send state update
-        await runtime.ws_manager.broadcast(
-            {
-                "type": "state_update",
-                "timestamp": timestamp,
-                "sequence": int(timestamp * 1000),
-                "data": changes,
-            }
-        )
-
-        # Simulate squelch closing after a short delay
-        async def close_squelch():
-            await asyncio.sleep(2)  # 2 second hit
-            close_timestamp = time.time()
-            close_state = LiveState(
-                timestamp=close_timestamp,
-                frequency=162.550,
-                modulation="FM",
-                squelch_open=False,
-                rssi=0,
-                mode="SCAN",
-                channel=1,
-                alpha_tag="Test Channel",
-                volume=5,
-                battery=None,
-                stale=False,
-            )
-            close_changes = runtime.state_store.update_live_state(close_state)
-            await runtime.ws_manager.broadcast(
-                {
-                    "type": "state_update",
-                    "timestamp": close_timestamp,
-                    "sequence": int(close_timestamp * 1000),
-                    "data": close_changes,
-                }
-            )
-
-        # Run in background
-        asyncio.create_task(close_squelch())
-
-        return {"message": "Simulated hit", "frequency": 162.550, "duration": 2}
-
     @app.get("/api/v1/analytics/activity-log")
     async def get_activity_log(
         limit: int = 100,
@@ -1845,13 +1766,8 @@ def create_app(
             raise HTTPException(status_code=503, detail="audio_capture_disabled")
         if not hls.is_ready():
             raise HTTPException(status_code=503, detail="audio_stream_warming_up")
-        try:
-            data = hls.playlist_path.read_bytes()
-        except OSError as exc:
-            logger.error("Failed to read HLS playlist: %s", exc)
-            raise HTTPException(status_code=503, detail="audio_stream_unavailable")
-        return Response(
-            content=data,
+        return FileResponse(
+            path=hls.playlist_path,
             media_type="application/vnd.apple.mpegurl",
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
@@ -1874,18 +1790,13 @@ def create_app(
         path = hls.resolve_segment(name)
         if path is None:
             raise HTTPException(status_code=404, detail="segment_not_found")
-        try:
-            data = path.read_bytes()
-        except OSError as exc:
-            logger.warning("Failed to read HLS segment %s: %s", name, exc)
-            raise HTTPException(status_code=404, detail="segment_not_found")
         # Segments are short-lived in the rolling window; cache until the
         # HLS list would have rotated them out.
         ttl = (
             runtime.config.audio.segment_duration * runtime.config.audio.buffer_segments
         )
-        return Response(
-            content=data,
+        return FileResponse(
+            path=path,
             media_type="video/mp2t",
             headers={"Cache-Control": f"public, max-age={ttl}"},
         )
@@ -1920,7 +1831,14 @@ async def _monitor_usb(app: FastAPI) -> None:
         if runtime.device_info.connection_status == "connected" and runtime.transport:
             continue
         runtime.device_info.connection_status = "connecting"
-        created_transport = False
+        # Clear driver/scheduler before reconfiguring transport so any
+        # concurrent _poll_status iteration bails at its driver/scheduler
+        # check rather than calling into a half-replaced stack.
+        old_scheduler = runtime.scheduler
+        runtime.driver = None
+        runtime.scheduler = None
+        if old_scheduler:
+            await old_scheduler.stop()
         try:
             if runtime.transport:
                 await asyncio.to_thread(runtime.transport.reconnect, backoff)
@@ -1931,25 +1849,25 @@ async def _monitor_usb(app: FastAPI) -> None:
                     serial_number=runtime.config.device.usb_serial,
                     timeout=0.5,
                 )
-                transport.connect()
+                await asyncio.to_thread(transport.connect)
                 runtime.transport = transport
-                created_transport = True
 
-            if created_transport or not runtime.scheduler:
-                if runtime.scheduler:
-                    await runtime.scheduler.stop()
-                runtime.scheduler = CommandScheduler(runtime.transport)
-                await runtime.scheduler.start()
+            new_scheduler = CommandScheduler(runtime.transport)
+            await new_scheduler.start()
 
             model = await asyncio.wrap_future(runtime.transport.send_command("MDL"))
             model = (
                 model.split(",", 1)[1].strip() if model.startswith("MDL,") else model
             )
-            runtime.driver = (
-                SR30CDriver(runtime.scheduler)
+            new_driver = (
+                SR30CDriver(new_scheduler)
                 if "SR30C" in model
-                else BC125ATDriver(runtime.scheduler)
+                else BC125ATDriver(new_scheduler)
             )
+            # Publish scheduler before driver so _poll_status sees a valid
+            # pair (driver wraps scheduler).
+            runtime.scheduler = new_scheduler
+            runtime.driver = new_driver
             runtime.device_info.model = model.strip()
             runtime.device_info.connection_status = "connected"
             _clear_device_diagnostic(runtime.device_info)
