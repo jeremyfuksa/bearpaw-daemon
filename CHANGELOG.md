@@ -28,8 +28,12 @@ First public release on PyPI as `bearpaw-daemon`.
 - Repository layout flattened: `apps/daemon/*` is now the repository
   root. Install paths and import paths are unchanged.
 - Distributed via PyPI as `bearpaw-daemon`. Both `pip install
-  bearpaw-daemon` (generic) and `sudo ./scripts/install-pi.sh` (Pi
-  systemd setup) are supported.
+  bearpaw-daemon` (generic) and `sudo ./scripts/install-linux.sh`
+  (Debian-family systemd setup; Raspberry Pi OS is the typical case
+  but nothing is Pi-specific) are supported.
+- Renamed `scripts/install-pi.sh` to `scripts/install-linux.sh`. The
+  installer was always Debian-family Linux generic — the new name
+  reflects that.
 - README rewritten for first-time install by someone other than the
   author.
 

@@ -43,14 +43,15 @@ openapi-python-client generate --url http://localhost:8000/openapi.json
 npx openapi-typescript http://localhost:8000/openapi.json -o bearpaw.d.ts
 ```
 
-## Raspberry Pi installation
+## Linux systemd installation
 
-For a production Pi deployment, use the installer:
+For a production Linux deployment (Debian, Ubuntu, Raspberry Pi OS, or
+any Debian-family host), use the installer:
 
 ```bash
 git clone https://github.com/jeremyfuksa/bearpaw-daemon.git
 cd bearpaw-daemon
-sudo ./scripts/install-pi.sh
+sudo ./scripts/install-linux.sh
 ```
 
 The installer is idempotent — safe to re-run after updates. It:
@@ -74,7 +75,15 @@ sudo journalctl -u bearpaw -f   # watch logs
 
 To upgrade: `git pull`, then re-run the installer.
 
-## Hardware notes
+A Raspberry Pi (3 or newer) running Raspberry Pi OS is the typical
+deployment target, but nothing in the daemon or installer is
+Pi-specific — any Debian-family Linux box with a USB port and Python
+3.10+ works the same way. For non-Debian distros, install
+`libusb-1.0` and `python3-venv` (or equivalents) manually, then
+`pip install bearpaw-daemon` into a venv and adapt
+`packaging/systemd/bearpaw.service` to your paths.
+
+## Hardware and host notes
 
 - **Scanner cable:** USB-A to mini-B (BC125AT) or USB-C (SR30C).
 - **PC mode:** Some Uniden scanners need to be put into "PC/IF" mode
