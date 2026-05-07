@@ -153,7 +153,9 @@ seed_config() {
         log "${CONFIG_FILE} already exists; leaving it alone"
     else
         log "Seeding ${CONFIG_FILE} from config.example.yaml"
-        install -m 0644 "${INSTALL_DIR}/config.example.yaml" "${CONFIG_FILE}"
+        install -m 0644 \
+            "${INSTALL_DIR}/src/bearpaw/config.example.yaml" \
+            "${CONFIG_FILE}"
         chown root:"${SCANNER_GROUP}" "${CONFIG_FILE}"
     fi
 }

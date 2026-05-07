@@ -7,6 +7,7 @@ import logging
 import os
 import signal
 import sys
+from importlib import resources
 from typing import Optional
 
 import uvicorn
@@ -53,7 +54,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
     parser.add_argument("--pid-file", default="/var/run/bearpaw.pid")
     parser.add_argument("--log-file", default="/var/log/bearpaw.log")
+    parser.add_argument(
+        "--print-example-config",
+        action="store_true",
+        help="Print the bundled config.example.yaml to stdout and exit",
+    )
     return parser.parse_args()
+
+
+def _print_example_config() -> None:
+    text = (
+        resources.files("bearpaw")
+        .joinpath("config.example.yaml")
+        .read_text(encoding="utf-8")
+    )
+    sys.stdout.write(text)
 
 
 async def _foreground_console(app) -> None:
@@ -186,6 +201,9 @@ def run_server(
 
 def main() -> None:
     args = parse_args()
+    if args.print_example_config:
+        _print_example_config()
+        return
     config = load_config(args.config)
 
     if args.log_level:
