@@ -10,10 +10,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, WebSocket
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from bearpaw.audio import AudioCapture, HLSStream
 from bearpaw.config import AppConfig
 from bearpaw.discovery import discover_devices
 from bearpaw.models import (
@@ -119,8 +118,6 @@ class RuntimeState:
     mqtt_exporter: Optional[MqttExporter] = None
     analytics_db: Optional[object] = None
     preferences_store: Optional[PreferencesStore] = None
-    audio_capture: Optional[AudioCapture] = None
-    hls_stream: Optional[HLSStream] = None
 
 
 def create_app(
@@ -130,13 +127,11 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(
         title="Bearpaw",
-        version="1.0.0",
+        version="1.1.0",
         description=(
             "Headless control and telemetry service for Uniden handheld scanners.\n\n"
-            "Designed as a first-class API surface for external clients: the "
-            "Pi-hosted web dashboard, native iOS/CarPlay app, and any third-party "
-            "integration. Live audio is available as an HLS stream under "
-            "`/api/v1/stream/` when `audio.enabled` is configured."
+            "Designed as a first-class API surface for external clients and "
+            "third-party integrations."
         ),
         openapi_tags=[
             {
@@ -160,7 +155,6 @@ def create_app(
                 "description": "Historical activity metrics and heatmaps.",
             },
             {"name": "preferences", "description": "Daemon-level user preferences."},
-            {"name": "stream", "description": "Live audio HLS playlist and segments."},
         ],
     )
 
@@ -435,20 +429,6 @@ def create_app(
 
         preferences_store = PreferencesStore(config.state.db_path)
 
-        audio_capture: Optional[AudioCapture] = None
-        hls_stream: Optional[HLSStream] = None
-        if config.audio.enabled:
-            audio_capture = AudioCapture(config.audio)
-            hls_stream = HLSStream(audio_capture)
-            try:
-                await audio_capture.start()
-            except Exception:
-                logger.exception(
-                    "Audio capture failed to start; continuing without HLS stream"
-                )
-                audio_capture = None
-                hls_stream = None
-
         runtime = RuntimeState(
             config=config,
             transport=transport,
@@ -464,8 +444,6 @@ def create_app(
             mqtt_exporter=mqtt_exporter,
             analytics_db=analytics_db,
             preferences_store=preferences_store,
-            audio_capture=audio_capture,
-            hls_stream=hls_stream,
         )
         app.state.runtime = runtime
         if runtime.driver and runtime.transport:
@@ -496,11 +474,6 @@ def create_app(
             runtime.mqtt_exporter.close()
         if runtime.analytics_db:
             await runtime.analytics_db.close()
-        if runtime.audio_capture:
-            try:
-                await runtime.audio_capture.stop()
-            except Exception:
-                logger.exception("Error stopping audio capture")
 
     if startup_enabled:
         app.add_event_handler("startup", startup)
@@ -1749,57 +1722,6 @@ def create_app(
             }
             for hit in hits
         ]
-
-    @app.get(
-        "/api/v1/stream/live.m3u8",
-        tags=["stream"],
-        summary="Live scanner audio HLS playlist",
-        responses={
-            200: {"content": {"application/vnd.apple.mpegurl": {}}},
-            503: {"description": "Audio capture disabled or not yet ready"},
-        },
-    )
-    async def stream_playlist() -> Response:
-        runtime: RuntimeState = app.state.runtime
-        hls = runtime.hls_stream
-        if not hls or not runtime.config.audio.enabled:
-            raise HTTPException(status_code=503, detail="audio_capture_disabled")
-        if not hls.is_ready():
-            raise HTTPException(status_code=503, detail="audio_stream_warming_up")
-        return FileResponse(
-            path=hls.playlist_path,
-            media_type="application/vnd.apple.mpegurl",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
-
-    @app.get(
-        "/api/v1/stream/segment/{name}",
-        tags=["stream"],
-        summary="HLS audio segment (MPEG-TS)",
-        responses={
-            200: {"content": {"video/mp2t": {}}},
-            404: {"description": "Segment not found or invalid name"},
-            503: {"description": "Audio capture disabled"},
-        },
-    )
-    async def stream_segment(name: str) -> Response:
-        runtime: RuntimeState = app.state.runtime
-        hls = runtime.hls_stream
-        if not hls or not runtime.config.audio.enabled:
-            raise HTTPException(status_code=503, detail="audio_capture_disabled")
-        path = hls.resolve_segment(name)
-        if path is None:
-            raise HTTPException(status_code=404, detail="segment_not_found")
-        # Segments are short-lived in the rolling window; cache until the
-        # HLS list would have rotated them out.
-        ttl = (
-            runtime.config.audio.segment_duration * runtime.config.audio.buffer_segments
-        )
-        return FileResponse(
-            path=path,
-            media_type="video/mp2t",
-            headers={"Cache-Control": f"public, max-age={ttl}"},
-        )
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
