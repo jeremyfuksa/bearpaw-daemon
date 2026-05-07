@@ -13,7 +13,6 @@ import uvicorn
 
 from bearpaw.api import create_app
 from bearpaw.config import load_config
-from bearpaw.middleware import add_cors_middleware
 
 
 logger = logging.getLogger("bearpaw")
@@ -46,9 +45,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-port", type=int, help="API port override")
     parser.add_argument(
         "--log-level",
-        default="info",
+        default=None,
         choices=["debug", "info", "warning", "error", "critical"],
-        help="Logging level (default: info)",
+        help="Override logging.level from config",
     )
     parser.add_argument("--foreground", action="store_true", help="Run in foreground")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
@@ -96,7 +95,9 @@ async def _foreground_status(app) -> None:
         await asyncio.sleep(0.5)
 
 
-async def run_foreground(app, host: str, port: int, log_level: str) -> None:
+async def run_foreground(
+    app, host: str, port: int, log_level: str, config_path: Optional[str]
+) -> None:
     log_config = copy.deepcopy(uvicorn.config.LOGGING_CONFIG)
     log_config["formatters"]["access"]["fmt"] = (
         '%(levelprefix)s "%(request_line)s" %(status_code)s'
@@ -105,6 +106,7 @@ async def run_foreground(app, host: str, port: int, log_level: str) -> None:
         app, host=host, port=port, log_level=log_level, log_config=log_config
     )
     server = uvicorn.Server(config)
+    _install_signal_handlers(server, app, config_path)
     server_task = asyncio.create_task(server.serve())
     status_task = asyncio.create_task(_foreground_status(app))
     console_task = asyncio.create_task(_foreground_console(app))
@@ -129,7 +131,7 @@ def _daemonize(pid_file: str, log_file: str) -> None:
     pid = os.fork()
     if pid > 0:
         sys.exit(0)
-    os.umask(0)
+    os.umask(0o027)
     sys.stdout.flush()
     sys.stderr.flush()
     with open("/dev/null", "rb") as devnull:
@@ -186,6 +188,8 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
 
+    if args.log_level:
+        config.logging.level = args.log_level.upper()
     log_level = config.logging.level.upper()
     logging.basicConfig(level=log_level, format=config.logging.format)
     logging.getLogger().setLevel(log_level)
@@ -200,11 +204,13 @@ def main() -> None:
         sys.exit(2)
 
     app = create_app(config, port_override=args.port)
-    add_cors_middleware(app, origins=config.api.cors_origins)
     _install_access_log_filters()
+    uvicorn_log_level = config.logging.level.lower()
     if args.foreground:
         asyncio.run(
-            run_foreground(app, config.api.host, config.api.port, args.log_level)
+            run_foreground(
+                app, config.api.host, config.api.port, uvicorn_log_level, args.config
+            )
         )
         return
     run_server(
@@ -215,7 +221,7 @@ def main() -> None:
         args.pid_file,
         args.log_file,
         args.config,
-        args.log_level,
+        uvicorn_log_level,
     )
 
 

@@ -25,7 +25,6 @@ dependencies = [
 ]
 
 [project.scripts]
-bearpaw-daemon = "bearpaw.main:main"
 bearpaw = "bearpaw.main:main"
 
 [tool.setuptools]

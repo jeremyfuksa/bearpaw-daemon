@@ -36,5 +36,7 @@ class MqttExporter:
             logger.debug("MQTT publish failed: %s", exc)
 
     def close(self) -> None:
+        if not self._client:
+            return
         self._client.loop_stop()
         self._client.disconnect()

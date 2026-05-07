@@ -43,6 +43,7 @@ class WebSocketManager:
             try:
                 await websocket.send_json(message)
             except Exception:
+                logger.warning("WebSocket send failed; dropping client", exc_info=True)
                 self.disconnect(websocket)
 
     async def heartbeat(self) -> None:
@@ -82,6 +83,7 @@ class WebSocketManager:
         except WebSocketDisconnect:
             return
         except Exception:
+            logger.warning("WebSocket message handler aborted", exc_info=True)
             return
 
     def _is_subscribed(self, websocket: WebSocket, topic: str) -> bool:

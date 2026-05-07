@@ -8,6 +8,11 @@ ExecStart=/usr/local/bin/bearpaw --config /etc/bearpaw/config.yaml
 Restart=on-failure
 User=scanner
 Group=scanner
+# State files (scanner.db, analytics.db, now_scanning.txt, events.jsonl)
+# resolve relative to WorkingDirectory. StateDirectory creates and chowns
+# /var/lib/bearpaw automatically on service start.
+StateDirectory=bearpaw
+WorkingDirectory=/var/lib/bearpaw
 
 [Install]
 WantedBy=multi-user.target

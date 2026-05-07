@@ -4,3 +4,20 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.coverage
+.coverage.*
+htmlcov/
+
+# Daemon runtime artifacts
+config.yaml
+scanner.db
+analytics.db
+*.db-shm
+*.db-wal
+now_scanning.txt
+events.jsonl
+*.pid
+*.log
+
+# HLS scratch dirs
+.bearpaw-hls/
