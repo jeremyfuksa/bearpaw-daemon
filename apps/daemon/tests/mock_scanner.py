@@ -194,9 +194,10 @@ async def mock_scanner_server():
                 if data:
                     command = data.decode("utf-8").strip()
                     if command:
-                        _response = await ser.process_command(
-                            command
-                        )  # TODO: write back over serial
+                        # MockSerialPort handles bidirectional framing
+                        # internally; process_command queues the reply on
+                        # the read side so callers see it on the next read.
+                        await ser.process_command(command)
 
             except (KeyboardInterrupt, asyncio.CancelledError):
                 print("\n" + "=" * 60)
