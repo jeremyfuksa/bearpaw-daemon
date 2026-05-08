@@ -487,7 +487,6 @@ def create_app(
         if runtime.analytics_db:
             await runtime.analytics_db.close()
 
-
     @app.get(
         "/api/v1/status",
         response_model=LiveStateModel,
