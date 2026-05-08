@@ -8,6 +8,20 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
+## [1.2.0] — 2026-05-08
+
+### Added
+
+- `POST /api/v1/frequency` direct-tunes the radio to a given frequency
+  (MHz), with optional `modulation`. On the BC125AT this emulates the
+  front-panel keypad sequence (HOLD → digits → E), since the BC125AT
+  has no single-shot direct-tune serial command. (#13)
+- `POST /api/v1/commands/key` now accepts human-friendly key aliases
+  (`UP`, `DOWN`, `MENU`, `FUNC`, `HOLD`, `ENTER`, `LOCKOUT`/`L_OUT`,
+  ...) and translates them to the underlying Uniden serial KEY codes.
+  Native single-character codes (`H`, `S`, `E`, `.`, `0`-`9`, etc.)
+  still pass through unchanged. (#13)
+
 ## [1.1.1] — 2026-05-08
 
 ### Fixed

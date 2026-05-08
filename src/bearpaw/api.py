@@ -159,7 +159,7 @@ def create_app(
     app = FastAPI(
         lifespan=lifespan,
         title="Bearpaw",
-        version="1.1.1",
+        version="1.2.0",
         description=(
             "Headless control and telemetry service for Uniden handheld scanners.\n\n"
             "Designed as a first-class API surface for external clients and "
