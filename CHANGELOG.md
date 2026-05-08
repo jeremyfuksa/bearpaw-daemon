@@ -8,6 +8,15 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
+## [1.1.1] — 2026-05-08
+
+### Fixed
+
+- Daemon crashed at startup on FastAPI >= 0.110 (current PyPI ships
+  0.136 / Starlette 1.0) because `app.add_event_handler` was removed.
+  Switched to the `lifespan` context manager. The `fastapi` dependency
+  is now pinned to `>=0.110, <1.0`. (#10)
+
 ## [1.1.0] — 2026-05-07
 
 First public release on PyPI as `bearpaw-daemon`.
