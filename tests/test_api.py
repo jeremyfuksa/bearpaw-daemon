@@ -18,6 +18,10 @@ from bearpaw.websocket import WebSocketManager
 
 
 class StubDriver:
+    def __init__(self):
+        self.last_key: str | None = None
+        self.last_frequency: tuple[float, str | None] | None = None
+
     async def get_status(self):
         return LiveState(
             timestamp=time.time(),
@@ -40,6 +44,11 @@ class StubDriver:
         return True
 
     async def send_key(self, key_code: str):
+        self.last_key = key_code
+        return True
+
+    async def set_frequency(self, frequency_mhz: float, modulation=None):
+        self.last_frequency = (frequency_mhz, modulation)
         return True
 
     async def read_channel(self, index: int):
@@ -137,6 +146,41 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         response = self.client.post("/api/v1/commands/key", json={"key": "UP"})
         self.assertEqual(response.status_code, 200)
+
+    def test_key_aliases_translate_to_scanner_codes(self) -> None:
+        driver = self.client.app.state.runtime.driver
+        for friendly, expected in [
+            ("UP", ">"),
+            ("DOWN", "<"),
+            ("MENU", "M"),
+            ("FUNC", "F"),
+            ("HOLD", "H"),
+            ("ENTER", "E"),
+        ]:
+            response = self.client.post("/api/v1/commands/key", json={"key": friendly})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(driver.last_key, expected)
+
+    def test_key_passthrough_for_native_codes(self) -> None:
+        driver = self.client.app.state.runtime.driver
+        response = self.client.post("/api/v1/commands/key", json={"key": "."})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(driver.last_key, ".")
+
+    def test_set_frequency(self) -> None:
+        driver = self.client.app.state.runtime.driver
+        response = self.client.post(
+            "/api/v1/frequency",
+            json={"frequency": 151.25, "modulation": "FM"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(driver.last_frequency, (151.25, "FM"))
+
+    def test_set_frequency_modulation_optional(self) -> None:
+        driver = self.client.app.state.runtime.driver
+        response = self.client.post("/api/v1/frequency", json={"frequency": 462.5625})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(driver.last_frequency, (462.5625, None))
 
     def test_memory_queries(self) -> None:
         response = self.client.get("/api/v1/memory/channels")

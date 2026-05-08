@@ -15,8 +15,10 @@ from bearpaw.protocol.sr30c import SR30CDriver
 class StubScheduler:
     def __init__(self, responses):
         self._responses = iter(responses)
+        self.sent: list[str] = []
 
     def enqueue(self, raw, priority):
+        self.sent.append(raw)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         future.set_result(next(self._responses))
@@ -71,6 +73,34 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(channel.priority)
         self.assertEqual(channel.tone_squelch, 103.5)
         self.assertEqual(channel.bank, 1)
+
+    async def test_bc125at_set_frequency_sends_keypad_sequence(self) -> None:
+        # send_hold response, then digit + decimal keys, then E.
+        # 151.25 -> "151.25" -> 6 digit/decimal keys + final E = 7 KEY responses.
+        scheduler = StubScheduler(["KEY,H,P,OK"] + ["OK"] * 7)
+        driver = BC125ATDriver(scheduler)
+        ok = await driver.set_frequency(151.25, modulation="FM")
+        self.assertTrue(ok)
+        self.assertEqual(
+            scheduler.sent,
+            [
+                "KEY,H,P",
+                "KEY,1,P",
+                "KEY,5,P",
+                "KEY,1,P",
+                "KEY,.,P",
+                "KEY,2,P",
+                "KEY,5,P",
+                "KEY,E,P",
+            ],
+        )
+
+    async def test_bc125at_set_frequency_rejects_out_of_range(self) -> None:
+        driver = BC125ATDriver(StubScheduler([]))
+        with self.assertRaises(ValueError):
+            await driver.set_frequency(10.0)
+        with self.assertRaises(ValueError):
+            await driver.set_frequency(2000.0)
 
 
 if __name__ == "__main__":
