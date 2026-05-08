@@ -134,6 +134,11 @@ class KeyRequest(BaseModel):
     key: str
 
 
+class FrequencyRequest(BaseModel):
+    frequency: float
+    modulation: Optional[str] = None
+
+
 class VolumeRequest(BaseModel):
     volume: int
 

@@ -23,6 +23,12 @@ class ScannerDriver(ABC):
     async def send_key(self, key_code: str) -> bool:
         """Simulate keypress."""
 
+    async def set_frequency(
+        self, frequency_mhz: float, modulation: str | None = None
+    ) -> bool:
+        """Direct-tune to a specific frequency (MHz)."""
+        raise NotImplementedError
+
     @abstractmethod
     async def read_channel(
         self, index: int, assume_program_mode: bool = False

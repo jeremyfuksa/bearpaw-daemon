@@ -33,6 +33,7 @@ from bearpaw.models import (
     DeviceInfoModel,
     ErrorResponse,
     FirmwareInfo,
+    FrequencyRequest,
     KeyBeepSettings,
     KeyRequest,
     LiveState,
@@ -97,6 +98,25 @@ _NOISY_PATHS = {
     "/api/v1/analytics/busiest-channels",
     "/api/v1/analytics/hourly-heatmap",
     "/api/v1/analytics/session-stats",
+}
+
+
+# Friendly aliases the kiosk UI sends, mapped to Uniden serial KEY codes.
+# Pass-through is preserved: any single-character code already accepted by the
+# radio (e.g. "H", "S", "E", ".", "0"-"9") is forwarded unchanged.
+_KEY_ALIASES = {
+    "UP": ">",
+    "DOWN": "<",
+    "RIGHT": ">",
+    "LEFT": "<",
+    "MENU": "M",
+    "FUNC": "F",
+    "FUNCTION": "F",
+    "HOLD": "H",
+    "SCAN": "S",
+    "ENTER": "E",
+    "L_OUT": "L",
+    "LOCKOUT": "L",
 }
 
 
@@ -547,10 +567,31 @@ def create_app(
     async def key_command(request: KeyRequest) -> Dict[str, str]:
         runtime: RuntimeState = app.state.runtime
         driver = require_driver(runtime)
-        ok = await driver.send_key(request.key)
+        key_code = _KEY_ALIASES.get(request.key.upper(), request.key)
+        ok = await driver.send_key(key_code)
         if not ok:
             detail = getattr(driver, "last_error", None) or "key_failed"
             logger.warning("Key command failed (%s): %s", request.key, detail)
+            raise HTTPException(status_code=500, detail=detail)
+        return {"status": "ok"}
+
+    @app.post("/api/v1/frequency")
+    async def set_frequency(request: FrequencyRequest) -> Dict[str, str]:
+        runtime: RuntimeState = app.state.runtime
+        driver = require_driver(runtime)
+        setter = getattr(driver, "set_frequency", None)
+        if setter is None:
+            raise HTTPException(status_code=400, detail="frequency_unsupported")
+        try:
+            ok = await call_or_unsupported(
+                lambda: setter(request.frequency, request.modulation),
+                "frequency_unsupported",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not ok:
+            detail = getattr(driver, "last_error", None) or "frequency_failed"
+            logger.warning("Direct tune failed (%s MHz): %s", request.frequency, detail)
             raise HTTPException(status_code=500, detail=detail)
         return {"status": "ok"}
 

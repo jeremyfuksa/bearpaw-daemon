@@ -208,6 +208,39 @@ class BC125ATDriver(ScannerDriver):
             )
         return ok
 
+    async def set_frequency(
+        self, frequency_mhz: float, modulation: Optional[str] = None
+    ) -> bool:
+        if not 25.0 <= frequency_mhz <= 1300.0:
+            raise ValueError("frequency_out_of_range")
+        # BC125AT has no direct-tune serial command; emulate the front-panel
+        # keypad sequence: HOLD, digits + decimal, E.
+        if not await self.send_hold():
+            return False
+        digits = f"{frequency_mhz:.4f}".rstrip("0").rstrip(".")
+        for char in digits:
+            key = "." if char == "." else char
+            response = await self._send(f"KEY,{key},P", PRIORITY_CONTROL)
+            if not self._is_ok_response(response):
+                self.last_error = response.strip() or "frequency_failed"
+                self._logger.warning(
+                    "Direct tune key '%s' rejected: %s", key, self.last_error
+                )
+                return False
+        response = await self._send("KEY,E,P", PRIORITY_CONTROL)
+        ok = self._is_ok_response(response)
+        if ok:
+            self.last_error = None
+            self._mode = "HOLD"
+            if modulation:
+                self._logger.info(
+                    "Modulation hint %s ignored: BC125AT modulation is per-channel",
+                    modulation,
+                )
+        else:
+            self.last_error = response.strip() or "frequency_failed"
+        return ok
+
     async def set_volume(self, volume: int) -> bool:
         if not 0 <= volume <= 15:
             raise ValueError("volume_out_of_range")
