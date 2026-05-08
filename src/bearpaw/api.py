@@ -6,6 +6,7 @@ import io
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
@@ -125,7 +126,18 @@ def create_app(
     port_override: Optional[str] = None,
     startup_enabled: bool = True,
 ) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if startup_enabled:
+            await startup()
+        try:
+            yield
+        finally:
+            if startup_enabled:
+                await shutdown()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="Bearpaw",
         version="1.1.0",
         description=(
@@ -474,10 +486,6 @@ def create_app(
             runtime.mqtt_exporter.close()
         if runtime.analytics_db:
             await runtime.analytics_db.close()
-
-    if startup_enabled:
-        app.add_event_handler("startup", startup)
-        app.add_event_handler("shutdown", shutdown)
 
     @app.get(
         "/api/v1/status",
