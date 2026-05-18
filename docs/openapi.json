@@ -3,7 +3,7 @@
   "info": {
     "title": "Bearpaw",
     "description": "Headless control and telemetry service for Uniden handheld scanners.\n\nDesigned as a first-class API surface for external clients and third-party integrations.",
-    "version": "1.1.0"
+    "version": "1.3.0"
   },
   "paths": {
     "/api/v1/status": {
@@ -197,6 +197,48 @@
                   },
                   "type": "object",
                   "title": "Response Key Command Api V1 Commands Key Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/frequency": {
+      "post": {
+        "summary": "Set Frequency",
+        "operationId": "set_frequency_api_v1_frequency_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FrequencyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Set Frequency Api V1 Frequency Post"
                 }
               }
             }
@@ -2595,6 +2637,30 @@
           "firmware"
         ],
         "title": "FirmwareInfo"
+      },
+      "FrequencyRequest": {
+        "properties": {
+          "frequency": {
+            "type": "number",
+            "title": "Frequency"
+          },
+          "modulation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modulation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frequency"
+        ],
+        "title": "FrequencyRequest"
       },
       "HTTPValidationError": {
         "properties": {
