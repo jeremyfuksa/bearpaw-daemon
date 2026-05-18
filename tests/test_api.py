@@ -250,6 +250,65 @@ class AdaptivePollIntervalTests(unittest.TestCase):
         # Disconnected backoff is sts_interval * 5 regardless of idle setting.
         self.assertAlmostEqual(_select_poll_interval(runtime), 0.5)
 
+    def test_passive_state_subscriber_does_not_force_fast_rate(self) -> None:
+        # Regression for the v1.3.0 kiosk case: a WS client subscribed to
+        # "state" with live=false should NOT pin the daemon at fast rate.
+        ws_manager = WebSocketManager(WebSocketConfig())
+        ws_manager._connections.add("kiosk")  # type: ignore[arg-type]
+        ws_manager._topics["kiosk"] = {"state"}  # type: ignore[index]
+        ws_manager._live["kiosk"] = False  # type: ignore[index]
+        runtime = self._runtime(ws_manager)
+        self.assertEqual(_select_poll_interval(runtime), 1.0)
+
+    def test_mixed_live_and_passive_uses_fast_rate(self) -> None:
+        # If any state subscriber is live, the daemon stays fast.
+        ws_manager = WebSocketManager(WebSocketConfig())
+        ws_manager._connections.update(["kiosk", "browser"])  # type: ignore[arg-type]
+        ws_manager._topics["kiosk"] = {"state"}  # type: ignore[index]
+        ws_manager._live["kiosk"] = False  # type: ignore[index]
+        ws_manager._topics["browser"] = {"state"}  # type: ignore[index]
+        ws_manager._live["browser"] = True  # type: ignore[index]
+        runtime = self._runtime(ws_manager)
+        self.assertAlmostEqual(_select_poll_interval(runtime), 0.1)
+
+
+class WebSocketSubscribeLiveFlagTests(unittest.TestCase):
+    def test_subscribe_sets_live_flag(self) -> None:
+        ws_manager = WebSocketManager(WebSocketConfig())
+        sentinel = object()
+        ws_manager._connections.add(sentinel)  # type: ignore[arg-type]
+        ws_manager._topics[sentinel] = None  # type: ignore[index]
+        ws_manager._live[sentinel] = True  # type: ignore[index]
+
+        # Simulate the subscribe-message branch of handle_messages.
+        data = {"type": "subscribe", "topics": ["state"], "live": False}
+        topics = data.get("topics", [])
+        if isinstance(topics, list):
+            ws_manager._topics[sentinel] = set(topics)  # type: ignore[index]
+        if "live" in data:
+            ws_manager._live[sentinel] = bool(data.get("live"))  # type: ignore[index]
+
+        self.assertFalse(ws_manager.has_live_subscribers_for("state"))
+        self.assertTrue(ws_manager.has_subscribers_for("state"))
+
+    def test_subscribe_without_live_field_keeps_default(self) -> None:
+        # Backward compat: clients that don't send `live` keep the
+        # pre-1.4 behavior (forcing fast rate).
+        ws_manager = WebSocketManager(WebSocketConfig())
+        sentinel = object()
+        ws_manager._connections.add(sentinel)  # type: ignore[arg-type]
+        ws_manager._topics[sentinel] = None  # type: ignore[index]
+        ws_manager._live[sentinel] = True  # type: ignore[index]
+
+        data = {"type": "subscribe", "topics": ["state"]}
+        topics = data.get("topics", [])
+        if isinstance(topics, list):
+            ws_manager._topics[sentinel] = set(topics)  # type: ignore[index]
+        if "live" in data:
+            ws_manager._live[sentinel] = bool(data.get("live"))  # type: ignore[index]
+
+        self.assertTrue(ws_manager.has_live_subscribers_for("state"))
+
 
 if __name__ == "__main__":
     unittest.main()

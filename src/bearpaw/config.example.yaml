@@ -14,14 +14,16 @@ api:
 
 polling:
   # Fast poll rate (seconds) used while at least one WebSocket client
-  # is subscribed to the "state" topic.
+  # is subscribed to the "state" topic with live=true (default).
+  # Clients can opt out by sending {"type": "subscribe", "topics": [...],
+  # "live": false}, in which case the daemon stays on idle_sts_interval
+  # even with the client connected. Useful for kiosks whose WebSocket is
+  # always open but whose current view doesn't need 10 Hz updates.
   sts_interval: 0.1
-  # Slow poll rate (seconds) used when no client is subscribed. The
-  # BC125AT briefly lights its backlight on every protocol command, so
-  # bursts at sts_interval keep it lit continuously. Defaulting to 1 Hz
-  # while idle lets the radio's backlight dim during unattended scanning.
-  # Raise this for wall-mounted kiosks; lower it if you want the radio
-  # status to update quickly even without subscribers.
+  # Slow poll rate (seconds) used when no live subscriber is present
+  # (either no clients connected, or all state subscribers sent
+  # live=false). Defaulting to 1 Hz lets the BC125AT's backlight dim
+  # between polls during unattended scanning.
   idle_sts_interval: 1.0
   reconnect_backoff: [1, 2, 5, 10, 30]
 
