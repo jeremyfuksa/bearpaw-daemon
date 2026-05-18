@@ -92,6 +92,12 @@ class WebSocketManager:
             return True
         return topic in topics
 
+    def has_subscribers_for(self, topic: str) -> bool:
+        for websocket in self._connections:
+            if self._is_subscribed(websocket, topic):
+                return True
+        return False
+
 
 def _topic_for_message(message: dict) -> Optional[str]:
     msg_type = message.get("type")

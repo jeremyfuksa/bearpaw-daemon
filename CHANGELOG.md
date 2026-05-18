@@ -8,6 +8,26 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
+## [Unreleased]
+
+### Changed
+
+- Status polling (`STS`) is now adaptive. While at least one WebSocket
+  client is subscribed to the `state` topic, polling runs at
+  `polling.sts_interval` (default 10 Hz) as before. When no client is
+  subscribed, polling falls back to the new
+  `polling.idle_sts_interval` (default 1 Hz). This lets the BC125AT's
+  backlight dim during unattended scanning instead of being held lit by
+  back-to-back protocol commands, which matters for wall-mounted kiosk
+  installs. The fast rate is restored immediately on the next poll once
+  a client subscribes. (#16)
+
+### Added
+
+- `--poll-interval` and `--idle-poll-interval` CLI flags on `bearpaw`
+  override `polling.sts_interval` and `polling.idle_sts_interval`
+  without editing the config file. (#16)
+
 ## [1.2.0] — 2026-05-08
 
 ### Added
