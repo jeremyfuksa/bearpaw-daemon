@@ -10,8 +10,8 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 )
 
-from bearpaw.api import RuntimeState, create_app
-from bearpaw.config import AppConfig, WebSocketConfig
+from bearpaw.api import RuntimeState, _select_poll_interval, create_app
+from bearpaw.config import AppConfig, PollingConfig, WebSocketConfig
 from bearpaw.models import ChannelData, DeviceInfo, LiveState
 from bearpaw.state import StateStore
 from bearpaw.websocket import WebSocketManager
@@ -189,6 +189,66 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/memory/channels/1")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["alpha_tag"], "Police")
+
+
+class AdaptivePollIntervalTests(unittest.TestCase):
+    def _runtime(self, ws_manager: WebSocketManager) -> RuntimeState:
+        config = AppConfig(
+            polling=PollingConfig(sts_interval=0.1, idle_sts_interval=1.0)
+        )
+        device_info = DeviceInfo(
+            model="BC125AT",
+            port="/dev/ttyACM0",
+            vid=0x1965,
+            pid=0x0017,
+            serial_number=None,
+            description="Uniden Scanner",
+        )
+        device_info.connection_status = "connected"
+        return RuntimeState(
+            config=config,
+            transport=StubTransport(),
+            scheduler=StubScheduler(),
+            driver=StubDriver(),
+            state_store=StateStore(persistence=None),
+            ws_manager=ws_manager,
+            device_info=device_info,
+            session_id="test-session",
+        )
+
+    def test_uses_idle_interval_when_no_subscribers(self) -> None:
+        runtime = self._runtime(WebSocketManager(WebSocketConfig()))
+        self.assertEqual(_select_poll_interval(runtime), 1.0)
+
+    def test_uses_fast_interval_when_state_subscriber_present(self) -> None:
+        ws_manager = WebSocketManager(WebSocketConfig())
+        # Simulate a client subscribed only to the "state" topic.
+        ws_manager._connections.add("client-a")  # type: ignore[arg-type]
+        ws_manager._topics["client-a"] = {"state"}  # type: ignore[index]
+        runtime = self._runtime(ws_manager)
+        self.assertAlmostEqual(_select_poll_interval(runtime), 0.1)
+
+    def test_unfiltered_subscriber_counts_as_state_subscriber(self) -> None:
+        # Default-connected clients (topics=None) get all messages,
+        # including state, so they should keep the daemon at fast rate.
+        ws_manager = WebSocketManager(WebSocketConfig())
+        ws_manager._connections.add("client-b")  # type: ignore[arg-type]
+        ws_manager._topics["client-b"] = None  # type: ignore[index]
+        runtime = self._runtime(ws_manager)
+        self.assertAlmostEqual(_select_poll_interval(runtime), 0.1)
+
+    def test_non_state_subscriber_does_not_keep_fast_rate(self) -> None:
+        ws_manager = WebSocketManager(WebSocketConfig())
+        ws_manager._connections.add("client-c")  # type: ignore[arg-type]
+        ws_manager._topics["client-c"] = {"events"}  # type: ignore[index]
+        runtime = self._runtime(ws_manager)
+        self.assertEqual(_select_poll_interval(runtime), 1.0)
+
+    def test_disconnected_uses_backoff_multiplier(self) -> None:
+        runtime = self._runtime(WebSocketManager(WebSocketConfig()))
+        runtime.device_info.connection_status = "disconnected"
+        # Disconnected backoff is sts_interval * 5 regardless of idle setting.
+        self.assertAlmostEqual(_select_poll_interval(runtime), 0.5)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,11 @@ class ApiConfig(BaseModel):
 
 class PollingConfig(BaseModel):
     sts_interval: float = 0.1
+    # Slow poll rate used when no WebSocket client is subscribed to live
+    # state. Default 1 Hz so the BC125AT backlight has time to dim between
+    # protocol commands in kiosk/wall-mount deployments. Bursts back to
+    # sts_interval whenever a client subscribes to the "state" topic.
+    idle_sts_interval: float = 1.0
     reconnect_backoff: List[float] = Field(default_factory=lambda: [1, 2, 5, 10, 30])
 
 

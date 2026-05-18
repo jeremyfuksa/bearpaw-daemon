@@ -2001,7 +2001,14 @@ async def _poll_status(app: FastAPI) -> None:
                 logger.warning(
                     "Status poll failed: %s: %s", type(exc).__name__, exc, exc_info=True
                 )
-        poll_interval = runtime.config.polling.sts_interval * (
-            5 if runtime.device_info.connection_status == "disconnected" else 1
-        )
+        poll_interval = _select_poll_interval(runtime)
         await asyncio.sleep(poll_interval)
+
+
+def _select_poll_interval(runtime: RuntimeState) -> float:
+    polling = runtime.config.polling
+    if runtime.device_info.connection_status == "disconnected":
+        return polling.sts_interval * 5
+    if runtime.ws_manager.has_subscribers_for("state"):
+        return polling.sts_interval
+    return max(polling.sts_interval, polling.idle_sts_interval)

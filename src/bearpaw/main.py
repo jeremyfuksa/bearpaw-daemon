@@ -45,6 +45,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-host", help="API host override")
     parser.add_argument("--api-port", type=int, help="API port override")
     parser.add_argument(
+        "--poll-interval",
+        type=float,
+        help="STS poll interval (seconds) when a WebSocket client is "
+        "subscribed to live state. Overrides polling.sts_interval.",
+    )
+    parser.add_argument(
+        "--idle-poll-interval",
+        type=float,
+        help="STS poll interval (seconds) when no WebSocket client is "
+        "subscribed to live state. Overrides polling.idle_sts_interval. "
+        "Raise this for kiosk installs where the radio's backlight "
+        "should be allowed to dim between polls.",
+    )
+    parser.add_argument(
         "--log-level",
         default=None,
         choices=["debug", "info", "warning", "error", "critical"],
@@ -216,6 +230,10 @@ def main() -> None:
         config.api.host = args.api_host
     if args.api_port:
         config.api.port = args.api_port
+    if args.poll_interval is not None:
+        config.polling.sts_interval = args.poll_interval
+    if args.idle_poll_interval is not None:
+        config.polling.idle_sts_interval = args.idle_poll_interval
 
     if args.daemon and args.foreground:
         print("Choose either --daemon or --foreground", file=sys.stderr)
