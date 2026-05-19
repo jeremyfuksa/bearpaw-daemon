@@ -8,7 +8,7 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
-## [Unreleased]
+## [1.4.0] — 2026-05-18
 
 ### Added
 
