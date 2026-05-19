@@ -8,6 +8,27 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
+## [Unreleased]
+
+### Added
+
+- WebSocket `subscribe` messages now accept an optional `live` boolean.
+  When omitted or `true`, the subscriber forces the daemon to poll at
+  `polling.sts_interval` while subscribed to the `state` topic (the
+  v1.3.0 behavior). When `false`, the subscriber is treated as passive
+  and the daemon stays on `polling.idle_sts_interval` even while the
+  client is connected. Lets always-on kiosk clients opt out of fast
+  polling so the BC125AT's backlight can dim. (#16)
+
+### Fixed
+
+- v1.3.0's adaptive polling assumed any state subscriber wanted 10 Hz
+  updates, which broke the wall-mounted kiosk case where the kiosk's
+  WebSocket connection is always open even when no view needs
+  high-frequency state. Kiosk clients can now send
+  `{"type": "subscribe", "topics": [...], "live": false}` and the
+  daemon will stay at the idle poll rate. (#16)
+
 ## [1.3.0] — 2026-05-18
 
 ### Changed

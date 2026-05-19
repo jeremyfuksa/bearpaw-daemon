@@ -2009,6 +2009,6 @@ def _select_poll_interval(runtime: RuntimeState) -> float:
     polling = runtime.config.polling
     if runtime.device_info.connection_status == "disconnected":
         return polling.sts_interval * 5
-    if runtime.ws_manager.has_subscribers_for("state"):
+    if runtime.ws_manager.has_live_subscribers_for("state"):
         return polling.sts_interval
     return max(polling.sts_interval, polling.idle_sts_interval)

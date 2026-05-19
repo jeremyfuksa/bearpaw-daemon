@@ -19,6 +19,12 @@ class WebSocketManager:
         self._last_pong: Dict[WebSocket, float] = {}
         self._last_ping: Dict[WebSocket, float] = {}
         self._topics: Dict[WebSocket, Optional[Set[str]]] = {}
+        # Per-connection "live" flag. Default True preserves the pre-1.4
+        # contract where any subscriber forced fast STS polling. Clients
+        # that don't need 10 Hz state updates can send
+        # {"type": "subscribe", "topics": [...], "live": false} so the
+        # daemon stays on idle_sts_interval. See issue #16.
+        self._live: Dict[WebSocket, bool] = {}
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -28,12 +34,14 @@ class WebSocketManager:
         self._connections.add(websocket)
         self._last_pong[websocket] = time.time()
         self._topics[websocket] = None
+        self._live[websocket] = True
 
     def disconnect(self, websocket: WebSocket) -> None:
         self._connections.discard(websocket)
         self._last_pong.pop(websocket, None)
         self._last_ping.pop(websocket, None)
         self._topics.pop(websocket, None)
+        self._live.pop(websocket, None)
 
     async def broadcast(self, message: dict, force: bool = False) -> None:
         topic = _topic_for_message(message) if not force else None
@@ -80,6 +88,8 @@ class WebSocketManager:
                     topics = data.get("topics", [])
                     if isinstance(topics, list):
                         self._topics[websocket] = set(topics)
+                    if "live" in data:
+                        self._live[websocket] = bool(data.get("live"))
         except WebSocketDisconnect:
             return
         except Exception:
@@ -94,6 +104,14 @@ class WebSocketManager:
 
     def has_subscribers_for(self, topic: str) -> bool:
         for websocket in self._connections:
+            if self._is_subscribed(websocket, topic):
+                return True
+        return False
+
+    def has_live_subscribers_for(self, topic: str) -> bool:
+        for websocket in self._connections:
+            if not self._live.get(websocket, True):
+                continue
             if self._is_subscribed(websocket, topic):
                 return True
         return False
