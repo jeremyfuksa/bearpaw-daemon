@@ -65,4 +65,10 @@ def discover_devices() -> List[DeviceDescriptor]:
             )
     if devices:
         return devices
+    # On macOS, /dev/cu.usbmodem* is the call-out node and /dev/tty.usbmodem*
+    # is the dial-in node that blocks on open waiting for DCD the BC125AT
+    # never asserts. Prefer cu.* candidates so auto-detect doesn't hang.
+    serial_fallback_candidates.sort(
+        key=lambda d: 0 if "/dev/cu." in (d.port or "") else 1
+    )
     return serial_fallback_candidates

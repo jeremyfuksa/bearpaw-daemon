@@ -8,6 +8,27 @@ The HTTP + WebSocket API exposed by the daemon is a public contract.
 Breaking changes to the API drive a major version bump; additive
 changes drive a minor bump.
 
+## [Unreleased]
+
+### Fixed
+
+- BC125AT `set_frequency` upper bound is now 512 MHz (was 1300 MHz).
+  The BC125AT tunes 25–512 MHz per the Uniden protocol reference;
+  values above 512 MHz were guaranteed to be rejected by the radio
+  and the keypad-sequence emulation would emit a bogus tune attempt.
+- `set_channel` now rejects modulations outside `AUTO`/`AM`/`FM`/`NFM`
+  with `ValueError("modulation_invalid")` instead of letting the
+  scanner silently reject the write.
+- Serial port is now opened with explicit `8N1`, `rtscts=False`,
+  `xonxoff=False`, `dsrdtr=False`, and a 1 s write timeout. The
+  BC125AT is a native USB CDC-ACM device and pyserial's default DTR
+  toggle on open is known to desync the link or cause spurious
+  disconnects on some hosts.
+- macOS auto-detect now prefers `/dev/cu.usbmodem*` over
+  `/dev/tty.usbmodem*` when the OS doesn't report VID/PID. Opening
+  the `tty.*` node blocks on DCD the scanner never asserts, so the
+  daemon could hang on connect.
+
 ## [1.4.0] — 2026-05-18
 
 ### Added

@@ -27,7 +27,23 @@ class SerialTransport:
             return
         self._acquire_lock()
         try:
-            self._port = serial.Serial(self.port_name, self.baud, timeout=self.timeout)
+            # 115200 8N1, no flow control, no DTR toggle on open. The
+            # BC125AT (and the wider Uniden 125-class family) is a native
+            # USB CDC-ACM device; pyserial's default DTR/RTS handshake
+            # can desync the link or trigger a spurious disconnect on
+            # some hosts, so disable it explicitly.
+            self._port = serial.Serial(
+                self.port_name,
+                self.baud,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=self.timeout,
+                write_timeout=1.0,
+                rtscts=False,
+                xonxoff=False,
+                dsrdtr=False,
+            )
         except PermissionError as exc:
             self._release_lock()
             raise PermissionError(
