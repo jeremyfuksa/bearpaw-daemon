@@ -211,7 +211,9 @@ class BC125ATDriver(ScannerDriver):
     async def set_frequency(
         self, frequency_mhz: float, modulation: Optional[str] = None
     ) -> bool:
-        if not 25.0 <= frequency_mhz <= 1300.0:
+        # BC125AT tunes 25–512 MHz. Out-of-band values are rejected by the
+        # radio anyway; reject early so we don't emit a bogus keypad sequence.
+        if not 25.0 <= frequency_mhz <= 512.0:
             raise ValueError("frequency_out_of_range")
         # BC125AT has no direct-tune serial command; emulate the front-panel
         # keypad sequence: HOLD, digits + decimal, E.
@@ -508,6 +510,8 @@ class BC125ATDriver(ScannerDriver):
             return str(value)
 
         modulation = (channel.modulation or "AUTO").upper()
+        if modulation not in {"AUTO", "AM", "FM", "NFM"}:
+            raise ValueError("modulation_invalid")
         alpha_tag = sanitize_tag(channel.alpha_tag or "")
         tone_value = "" if channel.tone_squelch is None else str(channel.tone_squelch)
         delay_value = str(channel.delay)
